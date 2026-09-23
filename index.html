@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Higher or Lower — Médias de Acesso</title>
+  <meta name="description" content="Adivinha qual curso teve a nota de entrada mais alta ou mais vagas no Concurso Nacional de Acesso.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Ecrã inicial -->
+  <section id="ecra-inicio" class="ecra ativo">
+    <div class="intro">
+      <p class="etiqueta">CNA 2026 · 1.ª fase</p>
+      <h1>Higher <span>or</span> Lower</h1>
+
+      <form class="jogador" id="form-jogador">
+        <label for="nome-jogador">Como te chamas?</label>
+        <div class="linha">
+          <input id="nome-jogador" maxlength="20" placeholder="O teu nome" autocomplete="nickname">
+          <button class="btn btn-principal btn-pequeno" type="submit">Guardar</button>
+        </div>
+      </form>
+      <p class="jogador-ola" id="jogador-ola" hidden>
+        Olá, <strong id="jogador-nome"></strong> · <button type="button" class="btn-link" id="btn-mudar-nome">mudar nome</button>
+      </p>
+
+      <h2 class="titulo-seccao">Modo de jogo</h2>
+      <div class="modos" id="modos" role="radiogroup" aria-label="Modo de jogo"></div>
+
+      <div class="filtros">
+        <label>Área
+          <select id="filtro-area"></select>
+        </label>
+        <label>Região
+          <select id="filtro-regiao"></select>
+        </label>
+        <label>Tipo
+          <select id="filtro-tipo"></select>
+        </label>
+      </div>
+      <p class="info-filtro" id="info-filtro"></p>
+
+      <button id="btn-comecar" class="btn btn-principal">Jogar</button>
+      <p class="recorde-inicio">Recorde neste modo: <strong id="recorde-inicio">0</strong><span id="streak-inicio-box">
+        · Melhor streak: <strong id="streak-inicio">0</strong></span></p>
+      <button id="btn-ver-lb" class="btn btn-link" hidden>🏆 Ver leaderboard</button>
+    </div>
+  </section>
+
+  <!-- Ecrã de jogo -->
+  <section id="ecra-jogo" class="ecra">
+    <header class="placar">
+      <button class="btn btn-voltar" id="btn-sair" aria-label="Voltar ao início">←</button>
+      <div class="placar-item">Pontos <strong id="pontos">0</strong></div>
+      <div class="placar-item streak" id="streak-box">🔥 <strong id="streak">0</strong></div>
+      <div class="placar-item" id="tempo-box" hidden>⏱ <strong id="tempo">60</strong></div>
+      <div class="placar-item">Recorde <strong id="recorde">0</strong></div>
+    </header>
+    <p class="pergunta" id="pergunta"></p>
+    <div class="barra-tempo" id="barra-tempo" hidden><div id="barra-tempo-fill"></div></div>
+
+    <main class="arena">
+      <article class="cartao" id="cartao-a">
+        <p class="grau"></p>
+        <h2 class="curso"></h2>
+        <p class="inst"></p>
+        <p class="escola"></p>
+        <div class="valor-box">
+          <span class="valor"></span>
+          <span class="valor-legenda"></span>
+        </div>
+        <dl class="stats"></dl>
+      </article>
+
+      <div class="vs" id="vs">VS</div>
+
+      <article class="cartao" id="cartao-b">
+        <p class="grau"></p>
+        <h2 class="curso"></h2>
+        <p class="inst"></p>
+        <p class="escola"></p>
+        <div class="valor-box">
+          <span class="valor"></span>
+          <span class="valor-legenda"></span>
+        </div>
+        <dl class="stats"></dl>
+        <div class="botoes" id="botoes">
+          <button class="btn btn-alta" data-escolha="alta">▲ <span>Mais alta</span></button>
+          <button class="btn btn-baixa" data-escolha="baixa">▼ <span>Mais baixa</span></button>
+        </div>
+      </article>
+    </main>
+    <div class="toast" id="toast" aria-live="polite"></div>
+  </section>
+
+  <!-- Ecrã final -->
+  <section id="ecra-fim" class="ecra">
+    <div class="intro">
+      <p class="etiqueta" id="fim-modo">Fim de jogo</p>
+      <h1 id="fim-pontos">0</h1>
+      <p class="sub" id="fim-msg"></p>
+      <p class="fim-stats" id="fim-stats"></p>
+
+      <form id="form-lb" class="form-lb" hidden>
+        <label for="nome">Entra no leaderboard global</label>
+        <div class="linha">
+          <input id="nome" maxlength="20" placeholder="O teu nome" autocomplete="nickname" required>
+          <button class="btn btn-principal btn-pequeno" type="submit">Submeter</button>
+        </div>
+      </form>
+      <p class="lb-estado" id="lb-estado"></p>
+      <p class="info-filtro" id="lb-aviso-filtro" hidden>O leaderboard só conta jogos com todos os cursos (sem filtros).</p>
+
+      <div class="acoes">
+        <button id="btn-repetir" class="btn btn-principal">Jogar outra vez</button>
+        <button id="btn-menu" class="btn btn-secundario">Mudar modo</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Leaderboard -->
+  <section id="ecra-lb" class="ecra">
+    <div class="intro intro-lb">
+      <p class="etiqueta">Leaderboard global</p>
+      <h1 class="h1-lb">🏆 Top 10</h1>
+      <div class="tabs" id="lb-tabs" role="tablist"></div>
+      <ol class="lb-lista" id="lb-lista"></ol>
+      <p class="lb-estado" id="lb-lista-estado"></p>
+      <button id="btn-lb-voltar" class="btn btn-secundario">Voltar</button>
+    </div>
+  </section>
+
+  <footer class="rodape">
+    Dados: DGES — Concurso Nacional de Acesso 2026, 1.ª fase, contingente geral (notas na escala 0–200).
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

@@ -489,11 +489,11 @@ async function carregarLeaderboard() {
   lista.innerHTML = "";
   estado.className = "lb-estado";
   estado.textContent = "A carregar…";
-  // "melhores" é uma vista (supabase.sql) com a melhor pontuação de cada jogador em cada modo
+  // top das melhores pontuações (o mesmo jogador pode aparecer várias vezes)
   const campos = "select=nome,pontos,melhor_streak,criado_em";
   const chave = (n) => n.trim().toLowerCase();
   try {
-    const r = await lbPedido(`melhores?${campos}&modo=eq.${pedido}&order=pontos.desc,criado_em.asc&limit=${TOP}`);
+    const r = await lbPedido(`pontuacoes?${campos}&modo=eq.${pedido}&order=pontos.desc,criado_em.asc&limit=${TOP}`);
     const ranking = await r.json();
     if (pedido !== lbModo) return;
 
@@ -501,12 +501,12 @@ async function carregarLeaderboard() {
     let minha = meuNome ? ranking.findIndex((l) => chave(l.nome) === chave(meuNome)) : -1;
     let minhaLinha = ranking[minha];
     if (meuNome && minha < 0) {
-      // fora do top: vai buscar a melhor pontuação do jogador e conta quantos estão à frente
+      // fora do top: vai buscar a melhor pontuação do jogador (vista "melhores") e conta quantas estão à frente
       try {
         const rm = await lbPedido(`melhores?${campos}&modo=eq.${pedido}&chave=eq.${encodeURIComponent(chave(meuNome))}`);
         minhaLinha = (await rm.json())[0];
         if (minhaLinha) {
-          const rc = await lbPedido(`melhores?select=nome&modo=eq.${pedido}&pontos=gt.${minhaLinha.pontos}`, {
+          const rc = await lbPedido(`pontuacoes?select=nome&modo=eq.${pedido}&pontos=gt.${minhaLinha.pontos}`, {
             method: "HEAD", headers: { Prefer: "count=exact", Range: "0-0" },
           });
           const frente = Number((rc.headers.get("content-range") || "").split("/")[1]);

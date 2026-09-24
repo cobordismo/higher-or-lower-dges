@@ -571,7 +571,7 @@ function linhaLb(l, i) {
 
 // pede uma página do ranking e devolve as linhas; lê o total do cabeçalho Content-Range
 async function paginaLb(pedido, inicio, n) {
-  const r = await lbPedido(`pontuacoes?${camposLb}&modo=eq.${pedido}&order=pontos.desc,criado_em.asc` +
+  const r = await lbPedido(`pontuacoes?${camposLb}&modo=eq.${pedido}&order=pontos.desc,melhor_streak.desc,criado_em.asc` +
     `&offset=${inicio}&limit=${n}`, { headers: { Prefer: "count=exact" } });
   const total = Number((r.headers.get("content-range") || "").split("/")[1]);
   return { linhas: await r.json(), total: Number.isFinite(total) ? total : null };
@@ -603,6 +603,11 @@ async function carregarLeaderboard() {
   lista.innerHTML = "";
   $("#btn-lb-mais").hidden = true;
   $("#lb-titulo").textContent = `🏆 Top ${TOP}`;
+  // nos modos clássicos a streak é igual aos pontos, por isso só o tempo desempata
+  $("#lb-desempate").textContent = MODOS[pedido].tempo
+    ? "Empates nos pontos: ganha a melhor streak 🔥; se continuar empatado, quem chegou primeiro."
+    : "Empates nos pontos: ganha quem chegou primeiro.";
+  carregarTimeline(pedido);
   estado.className = "lb-estado";
   estado.textContent = "A carregar…";
   try {
@@ -620,7 +625,10 @@ async function carregarLeaderboard() {
         const rm = await lbPedido(`melhores?${camposLb}&modo=eq.${pedido}&chave=eq.${encodeURIComponent(meu)}`);
         lb.minhaLinha = (await rm.json())[0] || null;
         if (lb.minhaLinha) {
-          const rc = await lbPedido(`pontuacoes?select=nome&modo=eq.${pedido}&pontos=gt.${lb.minhaLinha.pontos}`, {
+          const { pontos: p, melhor_streak: st } = lb.minhaLinha;
+          // à frente: mais pontos, ou os mesmos pontos com melhor streak
+          const rc = await lbPedido(`pontuacoes?select=nome&modo=eq.${pedido}` +
+            `&or=(pontos.gt.${p},and(pontos.eq.${p},melhor_streak.gt.${st}))`, {
             method: "HEAD", headers: { Prefer: "count=exact", Range: "0-0" },
           });
           const frente = Number((rc.headers.get("content-range") || "").split("/")[1]);
@@ -660,6 +668,80 @@ async function verMaisLb() {
     btn.disabled = false;
     btn.textContent = "Não foi possível carregar. Tentar outra vez";
   }
+}
+
+// ================== Timeline do 1.º lugar ==================
+// A contagem começa aqui (hora de Portugal): o que aconteceu antes não conta para a timeline.
+const INICIO_TIMELINE = new Date("2026-09-24T11:00:00+01:00");
+
+function duracao(ms) {
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "menos de 1 min";
+  const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60;
+  if (d) return `${d} d${h ? ` ${h} h` : ""}`;
+  if (h) return `${h} h${m ? ` ${m} min` : ""}`;
+  return `${m} min`;
+}
+
+const quando = (iso) => {
+  const t = new Date(iso);
+  return t.toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" }) + " " +
+    t.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+};
+
+async function carregarTimeline(pedido) {
+  const lista = $("#timeline"), resumo = $("#timeline-resumo"), box = $("#timeline-box");
+  lista.innerHTML = ""; resumo.innerHTML = "";
+  box.hidden = true;
+  try {
+    const r = await lbPedido(`lideres?select=nome,pontos,melhor_streak,desde,ate&modo=eq.${pedido}&order=desde.desc&limit=200`);
+    // corta na hora de início: reinados que acabaram antes saem; o líder dessa hora conta só a partir dela
+    const reinados = (await r.json())
+      .filter((x) => !x.ate || new Date(x.ate) > INICIO_TIMELINE)
+      .map((x) => new Date(x.desde) < INICIO_TIMELINE ? { ...x, desde: INICIO_TIMELINE.toISOString() } : x);
+    if (pedido !== lbModo || !reinados.length) return;
+    const agora = Date.now();
+    const comStreak = Boolean(MODOS[pedido].tempo);
+    reinados.forEach((x) => { x.ms = (x.ate ? new Date(x.ate) : agora) - new Date(x.desde); });
+
+    // resumo: tempo total em 1.º por jogador
+    const total = new Map();
+    for (const x of reinados) {
+      const k = chaveNome(x.nome);
+      const t = total.get(k) || { nome: x.nome, ms: 0, vezes: 0 };
+      t.ms += x.ms; t.vezes++;
+      total.set(k, t);
+    }
+    const jogadores = [...total.values()].sort((a, b) => b.ms - a.ms);
+    const soma = jogadores.reduce((s, j) => s + j.ms, 0) || 1;
+    const meu = chaveNome(nomeJogador());
+    for (const j of jogadores.slice(0, 8)) {
+      const div = document.createElement("div");
+      div.className = "tl-jogador" + (chaveNome(j.nome) === meu ? " eu" : "");
+      div.innerHTML = `<span class="tl-j-nome"></span>
+        <span class="tl-barra"><span style="width:${Math.max(2, (100 * j.ms) / soma)}%"></span></span>
+        <span class="tl-j-tempo">${duracao(j.ms)}</span>`;
+      div.querySelector(".tl-j-nome").textContent = j.nome;
+      div.title = `${j.vezes} ${j.vezes === 1 ? "vez" : "vezes"} em 1.º`;
+      resumo.appendChild(div);
+    }
+
+    // cronologia: do mais recente para o mais antigo
+    reinados.forEach((x, i) => {
+      const li = document.createElement("li");
+      li.className = (x.ate ? "" : "atual ") + (chaveNome(x.nome) === meu ? "eu" : "");
+      li.innerHTML = `<span class="tl-ponto"></span>
+        <div class="tl-corpo">
+          <div class="tl-linha"><strong class="tl-nome"></strong>
+            <span class="tl-pts">${x.pontos} pts${comStreak ? ` · 🔥 ${x.melhor_streak}` : ""}</span></div>
+          <div class="tl-quando">${quando(x.desde)} → ${x.ate ? quando(x.ate) : "agora"} ·
+            <b>${x.ate ? duracao(x.ms) : duracao(x.ms) + " e a contar"}</b></div>
+        </div>`;
+      li.querySelector(".tl-nome").textContent = (x.ate ? "" : "👑 ") + x.nome;
+      lista.appendChild(li);
+    });
+    box.hidden = false;
+  } catch {}
 }
 
 // ================== Cursos subestimados / sobrestimados ==================

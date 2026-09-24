@@ -151,6 +151,30 @@ select:focus, input:focus, .modo:focus-visible, .btn:focus-visible { outline: 2p
 .lb-lista.lista-cursos .lb-pontos { grid-area: pontos; font-size: 1.05rem; }
 .lb-lista.lista-cursos li.lb-separador { padding: 10px 0; }
 .lb-separador.erro { color: var(--vermelho); }
+.lb-desempate { margin: -4px 0 10px; }
+
+/* Timeline do 1.º lugar */
+.timeline-box { text-align: left; margin: 26px 0 18px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,.08); }
+.timeline-box[hidden] { display: none; }
+.tl-resumo { display: grid; gap: 6px; margin: 4px 0 18px; }
+.tl-jogador { display: grid; grid-template-columns: minmax(70px, 30%) 1fr auto; align-items: center; gap: 10px; font-size: .88rem; }
+.tl-j-nome { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-jogador.eu .tl-j-nome { color: var(--acento); }
+.tl-barra { height: 8px; border-radius: 99px; background: rgba(255,255,255,.07); overflow: hidden; }
+.tl-barra span { display: block; height: 100%; border-radius: 99px; background: var(--acento); }
+.tl-j-tempo { font-size: .78rem; color: var(--suave); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.timeline { list-style: none; position: relative; padding-left: 22px; }
+.timeline::before { content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 2px; background: rgba(255,255,255,.1); }
+.timeline li { position: relative; padding: 0 0 14px; }
+.tl-ponto { position: absolute; left: -21px; top: 5px; width: 12px; height: 12px; border-radius: 50%;
+            background: var(--fundo); border: 2px solid var(--suave); }
+.timeline li.atual .tl-ponto { background: var(--acento); border-color: var(--acento); box-shadow: 0 0 0 4px rgba(255,204,77,.2); }
+.tl-linha { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.tl-nome { font-weight: 700; }
+.timeline li.eu .tl-nome { color: var(--acento); }
+.tl-pts { font-size: .85rem; color: var(--acento); font-weight: 700; white-space: nowrap; }
+.tl-quando { font-size: .78rem; color: var(--suave); margin-top: 2px; }
+.tl-quando b { color: var(--texto); font-weight: 600; }
 .nota-cursos { margin: -4px auto 16px; max-width: 520px; }
 .lb-pct { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
 .lb-pct strong { font-size: 1.15rem; }

@@ -24,7 +24,7 @@ create or replace view public.melhores with (security_invoker = on) as
 select distinct on (modo, lower(btrim(nome)))
   nome, lower(btrim(nome)) as chave, modo, pontos, melhor_streak, criado_em
 from public.pontuacoes
-order by modo, lower(btrim(nome)), pontos desc, criado_em asc;
+order by modo, lower(btrim(nome)), pontos desc, melhor_streak desc, criado_em asc;
 
 -- Segurança: qualquer pessoa pode ler e inserir; ninguém pode alterar ou apagar pela API.
 alter table public.pontuacoes enable row level security;
@@ -40,6 +40,22 @@ create policy "inserir pontuacoes" on public.pontuacoes
 grant select, insert on public.pontuacoes to anon, authenticated;
 revoke update, delete on public.pontuacoes from anon, authenticated;
 grant select on public.melhores to anon, authenticated;
+
+-- Timeline do 1.º lugar: cada linha é um "reinado" (quem passou para a frente, desde quando e até quando).
+-- Ordem do ranking: mais pontos; em empate, melhor streak; em empate, quem chegou primeiro.
+-- (pontos * 10000 + streak) compara as duas coisas de uma vez, porque a streak nunca passa de 1000.
+create or replace view public.lideres with (security_invoker = on) as
+select modo, nome, pontos, melhor_streak, criado_em as desde,
+       lead(criado_em) over (partition by modo order by criado_em) as ate
+from (
+  select p.*,
+         max(pontos * 10000 + melhor_streak) over (
+           partition by modo order by criado_em rows between unbounded preceding and 1 preceding
+         ) as melhor_antes
+  from public.pontuacoes p
+) t
+where melhor_antes is null or pontos * 10000 + melhor_streak > melhor_antes;
+grant select on public.lideres to anon, authenticated;
 
 -- Para apagar uma pontuação falsa: Table Editor → pontuacoes → selecionar a linha → Delete.
 

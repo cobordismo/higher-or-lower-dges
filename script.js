@@ -1,3 +1,6 @@
+// se o localStorage falhar (modo privado, browsers dentro de apps), o valor fica pelo menos em memória
+const memoriaLS = new Map();
+
 // ================== Dados ==================
 // DADOS vem de data.js: { i: [instituições], c: [[idxInst, curso, grau, nota, vagas, colocados], ...] }
 const semAcentos = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -83,7 +86,7 @@ let pool = [], vistos = new Set();
 let atual, proximo, pontos = 0, streak = 0, melhorStreakJogo = 0, aBloquear = false;
 let recordeAntes = 0, tempoRestante = 0, timerId = null, fimTempo = 0, emJogo = false;
 let ultimoErro = null, jogoSubmetido = false;
-let palpitesJogo = []; // erros deste jogo, enviados no fim (cursos subestimados/sobrestimados)
+let palpitesJogo = []; // palpites deste jogo, enviados no fim (cursos subestimados/sobrestimados)
 
 // migrar recorde da versão anterior
 if (lerLS("hl-recorde", null) && !lerLS("hl-recorde-classico", null)) guardarLS("hl-recorde-classico", lerLS("hl-recorde", 0));
@@ -97,8 +100,11 @@ const vs = $("#vs");
 const botoes = document.querySelectorAll("#botoes .btn");
 
 // ================== Utilitários ==================
-function lerLS(k, def) { try { const v = localStorage.getItem(k); return v === null ? def : v; } catch { return def; } }
-function guardarLS(k, v) { try { localStorage.setItem(k, v); } catch {} }
+function lerLS(k, def) {
+  try { const v = localStorage.getItem(k); if (v !== null) return v; } catch {}
+  return memoriaLS.has(k) ? memoriaLS.get(k) : def;
+}
+function guardarLS(k, v) { memoriaLS.set(k, String(v)); try { localStorage.setItem(k, v); } catch {} }
 const recordeDe = (m) => Number(lerLS("hl-recorde-" + m, 0)) || 0;
 const streakDe = (m) => Number(lerLS("hl-streak-" + m, 0)) || 0;
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -142,6 +148,13 @@ function guardarNome(e) {
   if (!nome) { $("#nome-jogador").focus(); return; }
   guardarLS("hl-nome", nome);
   mostrarNome();
+}
+
+// quem escreve o nome e carrega logo em "Jogar" (sem "Guardar") também fica com o nome guardado
+function guardarNomeEscrito() {
+  if ($("#form-jogador").hidden) return;
+  const nome = limparNome($("#nome-jogador").value);
+  if (nome) { guardarLS("hl-nome", nome); mostrarNome(); }
 }
 
 // ================== Ecrã inicial ==================
@@ -259,6 +272,7 @@ function atualizarPlacar() {
 }
 
 function comecar() {
+  guardarNomeEscrito();
   const m = MODOS[modo];
   calcularPool();
   if (pool.length < 2) return;
@@ -323,6 +337,8 @@ async function escolher(escolha) {
 
   const a = atual[campo], b = proximo[campo];
   const certo = a === b || (escolha === "alta" && b > a) || (escolha === "baixa" && b < a);
+  // escolheu "mais baixa" e era mais alta → subestimado; o contrário → sobrestimado
+  palpitesJogo.push({ campo, chave: proximo.chave, tipo: certo ? "ok" : escolha === "baixa" ? "sub" : "sobre" });
 
   vs.classList.add(certo ? "certo" : "errado");
   vs.textContent = certo ? "✓" : "✗";
@@ -335,8 +351,6 @@ async function escolher(escolha) {
     if (rapido && streak % BONUS_CADA === 0) { ajustarTempo(BONUS); toast(`🔥 ${streak} seguidas · +${BONUS} s`, "bom"); }
   } else {
     ultimoErro = { a: atual, b: proximo };
-    // escolheu "mais baixa" e era mais alta → subestimado; o contrário → sobrestimado
-    palpitesJogo.push({ campo, chave: proximo.chave, tipo: escolha === "baixa" ? "sub" : "sobre" });
     streak = 0;
     if (rapido) { ajustarTempo(-PENALIZACAO); toast(`−${PENALIZACAO} s`, "mau"); }
   }
@@ -415,53 +429,97 @@ const lbAtivo = () => Boolean(CFG.SUPABASE_URL && CFG.SUPABASE_KEY);
 let lbModo = modo;
 const TOP = 10;
 
-async function lbPedido(caminho, opcoes = {}) {
+async function lbPedido(caminho, opcoes = {}, tempoMax = 8000) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 8000);
+  const t = setTimeout(() => ctrl.abort(), tempoMax);
   try {
     const r = await fetch(CFG.SUPABASE_URL.replace(/\/+$/, "").replace(/\/rest\/v1$/, "") + "/rest/v1/" + caminho, {
       ...opcoes,
       signal: ctrl.signal,
       headers: { apikey: CFG.SUPABASE_KEY, "Content-Type": "application/json", ...(opcoes.headers || {}) },
     });
-    if (!r.ok) throw new Error("HTTP " + r.status);
+    if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { status: r.status });
     return r;
   } finally { clearTimeout(t); }
 }
 
 let envioId = 0;
 
+// Pontuações ainda não confirmadas pelo servidor. Ficam guardadas no browser até serem aceites,
+// para não se perderem com rede fraca (telemóvel), o Supabase lento a acordar ou a página fechada a meio.
+const lerPendentes = () => { try { return JSON.parse(lerLS("hl-pendentes", "[]")) || []; } catch { return []; } };
+const guardarPendentes = (l) => guardarLS("hl-pendentes", JSON.stringify(l.slice(-20)));
+const novoId = () => (crypto.randomUUID ? crypto.randomUUID() :
+  "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+    (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
+
+// envia uma pontuação; o id é gerado no browser, por isso repetir o envio nunca cria duplicados
+async function enviarJogo(jogo, aFechar = false) {
+  try {
+    await lbPedido("pontuacoes", {
+      method: "POST",
+      keepalive: aFechar, // só ao fechar a página: nem todos os browsers aceitam keepalive sempre
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(jogo),
+    }, 20000);
+  } catch (e) {
+    if (e.status !== 409) throw e; // 409 = já tinha sido guardada numa tentativa anterior
+  }
+  guardarPendentes(lerPendentes().filter((p) => p.id !== jogo.id));
+}
+
+let aReenviar = false;
+async function reenviarPendentes() {
+  if (!lbAtivo() || aReenviar) return;
+  aReenviar = true;
+  try {
+    for (const jogo of lerPendentes()) await enviarJogo(jogo);
+  } catch {} finally { aReenviar = false; }
+}
+
 async function enviarPontuacao(nome) {
   if (jogoSubmetido) return;
   // fotografia do jogo: o jogador pode começar outro antes de o pedido acabar
   const id = ++envioId;
-  const jogo = { nome, modo, pontos, melhor_streak: melhorStreakJogo };
+  const jogo = { id: novoId(), nome, modo, pontos, melhor_streak: melhorStreakJogo };
+  jogoSubmetido = true;
+  guardarPendentes([...lerPendentes(), jogo]);
   const estado = $("#lb-estado");
   const valido = () => id === envioId && ecras.fim.classList.contains("ativo");
   $("#form-lb button").disabled = true;
+  $("#form-lb").hidden = true;
   estado.className = "lb-estado";
   estado.textContent = "A enviar para o leaderboard…";
-  try {
-    await lbPedido("pontuacoes", {
-      method: "POST",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify(jogo),
-    });
-    if (!valido()) return;
-    jogoSubmetido = true;
-    $("#form-lb").hidden = true;
-    estado.className = "lb-estado ok";
-    estado.innerHTML = `Pontuação enviada como <strong></strong>. <button type="button" class="btn-link" id="btn-lb-fim">Ver leaderboard</button>`;
-    estado.querySelector("strong").textContent = nome;
-    $("#btn-lb-fim").addEventListener("click", () => abrirLeaderboard(jogo.modo));
-  } catch {
-    if (!valido()) return;
-    $("#form-lb").hidden = false;
-    $("#nome").value = nome;
-    estado.className = "lb-estado erro";
-    estado.textContent = "Não foi possível enviar. Tenta outra vez.";
-    $("#form-lb button").disabled = false;
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      await enviarJogo(jogo);
+      break;
+    } catch {
+      if (tentativa >= 3) {
+        if (!valido()) return;
+        estado.className = "lb-estado erro";
+        estado.innerHTML = `Sem ligação ao leaderboard. A pontuação ficou guardada e é enviada assim que possível. ` +
+          `<button type="button" class="btn-link" id="btn-lb-tentar">Tentar agora</button>`;
+        $("#btn-lb-tentar").addEventListener("click", async () => {
+          estado.className = "lb-estado";
+          estado.textContent = "A enviar para o leaderboard…";
+          await reenviarPendentes();
+          if (!valido()) return;
+          const falta = lerPendentes().some((p) => p.id === jogo.id);
+          estado.className = "lb-estado " + (falta ? "erro" : "ok");
+          estado.textContent = falta ? "Ainda sem ligação. Voltamos a tentar mais tarde." : "Pontuação enviada!";
+        });
+        return;
+      }
+      if (valido()) estado.textContent = `A enviar para o leaderboard… (tentativa ${tentativa + 1})`;
+      await esperar(tentativa * 2000);
+    }
   }
+  if (!valido()) return;
+  estado.className = "lb-estado ok";
+  estado.innerHTML = `Pontuação enviada como <strong></strong>. <button type="button" class="btn-link" id="btn-lb-fim">Ver leaderboard</button>`;
+  estado.querySelector("strong").textContent = nome;
+  $("#btn-lb-fim").addEventListener("click", () => abrirLeaderboard(jogo.modo));
 }
 
 function lbSubmeter(e) {
@@ -605,16 +663,17 @@ async function verMaisLb() {
 }
 
 // ================== Cursos subestimados / sobrestimados ==================
-function enviarPalpites() {
+function enviarPalpites(aFechar = false) {
   const eventos = palpitesJogo.slice(0, 300);
   palpitesJogo = [];
   if (!lbAtivo() || !eventos.length) return;
-  // keepalive: o pedido chega mesmo que o jogador feche a página logo a seguir
-  lbPedido("rpc/registar_palpites", { method: "POST", keepalive: true, body: JSON.stringify({ eventos }) })
+  // keepalive (só ao fechar a página): o pedido chega mesmo que o jogador saia logo a seguir
+  lbPedido("rpc/registar_palpites", { method: "POST", keepalive: aFechar, body: JSON.stringify({ eventos }) })
     .catch(() => {});
 }
 
 let cursosCampo = "nota";
+const MIN_PALPITES = 5; // abaixo disto a percentagem ainda não diz nada
 
 function abrirCursos(campo = cursosCampo) {
   cursosCampo = campo;
@@ -626,31 +685,35 @@ function abrirCursos(campo = cursosCampo) {
   const nota = campo === "nota";
   $("#cursos-legenda-sub").textContent = nota ? "Os jogadores acharam a nota mais baixa do que é." : "Os jogadores acharam que tinha menos vagas.";
   $("#cursos-legenda-sobre").textContent = nota ? "Os jogadores acharam a nota mais alta do que é." : "Os jogadores acharam que tinha mais vagas.";
+  $("#cursos-nota").textContent = `Percentagem dos palpites em que os jogadores erraram assim. Só entram cursos com pelo menos ${MIN_PALPITES} palpites.`;
   mostrarEcra("cursos");
-  carregarCursos("subestimado", $("#lista-sub"));
-  carregarCursos("sobrestimado", $("#lista-sobre"));
+  carregarCursos("sub", $("#lista-sub"));
+  carregarCursos("sobre", $("#lista-sobre"));
 }
 
-async function carregarCursos(coluna, lista) {
+async function carregarCursos(tipo, lista) {
   const campo = cursosCampo;
+  const col = tipo === "sub" ? "subestimado" : "sobrestimado";
   lista.innerHTML = `<li class="lb-separador">A carregar…</li>`;
   try {
     // pede um pouco mais do que 10 para o caso de haver chaves que já não existem nos dados
-    const r = await lbPedido(`palpites_cursos?select=chave,${coluna}&campo=eq.${campo}` +
-      `&${coluna}=gt.0&order=${coluna}.desc&limit=${TOP + 10}`);
+    const r = await lbPedido(`palpites_cursos_pct?select=chave,vezes,${col},pct_${tipo}&campo=eq.${campo}` +
+      `&vezes=gte.${MIN_PALPITES}&${col}=gt.0&order=pct_${tipo}.desc,vezes.desc&limit=${TOP + 10}`);
     const linhas = (await r.json()).filter((l) => CURSO_POR_CHAVE.has(l.chave)).slice(0, TOP);
     if (campo !== cursosCampo) return;
     lista.innerHTML = "";
-    if (!linhas.length) lista.innerHTML = `<li class="lb-separador">Ainda sem dados. Joga para começar!</li>`;
+    if (!linhas.length) lista.innerHTML = `<li class="lb-separador">Ainda sem dados suficientes. Joga para começar!</li>`;
     linhas.forEach((l, i) => {
       const c = CURSO_POR_CHAVE.get(l.chave);
+      const pct = Math.round(Number(l[`pct_${tipo}`]));
       const li = document.createElement("li");
       li.innerHTML = `<span class="pos${i < 3 ? " pos-" + (i + 1) : ""}">${i + 1}</span>
         <span class="lb-nome"></span><span class="lb-extra"></span>
-        <strong class="lb-pontos" title="vezes que os jogadores erraram">${l[coluna]}×</strong>`;
+        <span class="lb-pontos lb-pct"><strong>${pct}%</strong><small>${l[col]} em ${l.vezes}</small></span>`;
       li.querySelector(".lb-nome").textContent = c.curso;
       li.querySelector(".lb-extra").textContent =
         `${c.inst} · ${formatar(c[campo], campo)}${campo === "vagas" ? " vagas" : ""}`;
+      li.querySelector(".lb-pct").title = `${l[col]} de ${l.vezes} palpites`;
       lista.appendChild(li);
     });
   } catch {
@@ -670,10 +733,16 @@ $("#btn-ver-cursos").addEventListener("click", () => abrirCursos());
 $("#btn-lb-cursos").addEventListener("click", () => abrirCursos());
 $("#btn-cursos-voltar").addEventListener("click", () => { mostrarEcra("inicio"); atualizarInicio(); });
 document.querySelectorAll("#cursos-tabs .tab").forEach((b) => b.addEventListener("click", () => abrirCursos(b.dataset.campo)));
-window.addEventListener("pagehide", () => { if (emJogo) enviarPalpites(); });
+// a página vai fechar: última tentativa de enviar o que ainda não chegou ao servidor
+window.addEventListener("pagehide", () => {
+  if (emJogo) enviarPalpites(true);
+  if (lbAtivo()) lerPendentes().forEach((j) => enviarJogo(j, true).catch(() => {}));
+});
+window.addEventListener("online", reenviarPendentes);
 $("#btn-lb-voltar").addEventListener("click", () => { mostrarEcra("inicio"); atualizarInicio(); });
 $("#form-lb").addEventListener("submit", lbSubmeter);
 $("#form-jogador").addEventListener("submit", guardarNome);
+$("#nome-jogador").addEventListener("change", guardarNomeEscrito);
 $("#btn-mudar-nome").addEventListener("click", () => mostrarNome(true));
 botoes.forEach((b) => b.addEventListener("click", () => escolher(b.dataset.escolha)));
 document.addEventListener("keydown", (e) => {
@@ -691,5 +760,6 @@ construirModos();
 construirFiltros();
 mostrarNome();
 $("#btn-ver-lb").hidden = !lbAtivo();
+reenviarPendentes();
 $("#btn-ver-cursos").hidden = !lbAtivo();
 atualizarInicio();

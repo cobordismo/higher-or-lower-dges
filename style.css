@@ -151,6 +151,10 @@ select:focus, input:focus, .modo:focus-visible, .btn:focus-visible { outline: 2p
 .lb-lista.lista-cursos .lb-pontos { grid-area: pontos; font-size: 1.05rem; }
 .lb-lista.lista-cursos li.lb-separador { padding: 10px 0; }
 .lb-separador.erro { color: var(--vermelho); }
+.nota-cursos { margin: -4px auto 16px; max-width: 520px; }
+.lb-pct { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.lb-pct strong { font-size: 1.15rem; }
+.lb-pct small { font-size: .68rem; font-weight: 500; color: var(--suave); white-space: nowrap; margin-top: 2px; }
 .lb-lista li {
   display: grid; grid-template-columns: 36px 1fr auto auto; align-items: center; gap: 10px;
   padding: 10px 12px; border-radius: 12px;

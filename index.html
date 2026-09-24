@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <!-- Ecrã inicial -->
@@ -47,7 +47,10 @@
       <button id="btn-comecar" class="btn btn-principal">Jogar</button>
       <p class="recorde-inicio">Recorde neste modo: <strong id="recorde-inicio">0</strong><span id="streak-inicio-box">
         · Melhor streak: <strong id="streak-inicio">0</strong></span></p>
-      <button id="btn-ver-lb" class="btn btn-link" hidden>🏆 Ver leaderboard</button>
+      <div class="links-inicio">
+        <button id="btn-ver-lb" class="btn btn-link" hidden>🏆 Ver leaderboard</button>
+        <button id="btn-ver-cursos" class="btn btn-link" hidden>📊 Ranking de cursos</button>
+      </div>
     </div>
   </section>
 
@@ -131,7 +134,33 @@
       <ol class="lb-lista" id="lb-lista"></ol>
       <button id="btn-lb-mais" class="btn-link lb-mais" type="button" hidden>⋯ Ver todas</button>
       <p class="lb-estado" id="lb-lista-estado"></p>
+      <button id="btn-lb-cursos" class="btn-link lb-mais" type="button">📊 Ver cursos subestimados e sobrestimados</button>
       <button id="btn-lb-voltar" class="btn btn-secundario">Voltar</button>
+    </div>
+  </section>
+
+  <!-- Cursos subestimados / sobrestimados -->
+  <section id="ecra-cursos" class="ecra">
+    <div class="intro intro-lb intro-cursos">
+      <p class="etiqueta">Onde os jogadores mais se enganam</p>
+      <h1 class="h1-lb">📊 Cursos</h1>
+      <div class="tabs" id="cursos-tabs" role="tablist">
+        <button class="tab ativa" role="tab" data-campo="nota">🎓 Notas</button>
+        <button class="tab" role="tab" data-campo="vagas">🪑 Vagas</button>
+      </div>
+      <div class="cursos-grelha">
+        <section>
+          <h2 class="titulo-cursos">📈 Top 10 subestimados</h2>
+          <p class="legenda-cursos" id="cursos-legenda-sub"></p>
+          <ol class="lb-lista lista-cursos" id="lista-sub"></ol>
+        </section>
+        <section>
+          <h2 class="titulo-cursos">📉 Top 10 sobrestimados</h2>
+          <p class="legenda-cursos" id="cursos-legenda-sobre"></p>
+          <ol class="lb-lista lista-cursos" id="lista-sobre"></ol>
+        </section>
+      </div>
+      <button id="btn-cursos-voltar" class="btn btn-secundario">Voltar</button>
     </div>
   </section>
 
@@ -139,8 +168,8 @@
     Dados: DGES — Concurso Nacional de Acesso 2026, 1.ª fase, contingente geral (notas na escala 0–200).
   </footer>
 
-  <script src="data.js?v=6"></script>
-  <script src="config.js?v=6"></script>
-  <script src="script.js?v=6"></script>
+  <script src="data.js?v=7"></script>
+  <script src="config.js?v=7"></script>
+  <script src="script.js?v=7"></script>
 </body>
 </html>

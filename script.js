@@ -38,8 +38,10 @@ const CURSOS = DADOS.c.map(([idx, curso, grau, nota, vagas, colocados], id) => {
     area: areaDe(curso),
     regiao: regiaoDe(inst),
     tipo: tipoDe(inst),
+    chave: `${nomeInst}|${curso}|${grau}`, // identifica o curso na base de dados
   };
 });
+const CURSO_POR_CHAVE = new Map(CURSOS.map((c) => [c.chave, c]));
 
 const GRAUS = { L1: "Licenciatura", MI: "Mestrado Integrado" };
 
@@ -81,13 +83,14 @@ let pool = [], vistos = new Set();
 let atual, proximo, pontos = 0, streak = 0, melhorStreakJogo = 0, aBloquear = false;
 let recordeAntes = 0, tempoRestante = 0, timerId = null, fimTempo = 0, emJogo = false;
 let ultimoErro = null, jogoSubmetido = false;
+let palpitesJogo = []; // erros deste jogo, enviados no fim (cursos subestimados/sobrestimados)
 
 // migrar recorde da versão anterior
 if (lerLS("hl-recorde", null) && !lerLS("hl-recorde-classico", null)) guardarLS("hl-recorde-classico", lerLS("hl-recorde", 0));
 
 // ================== Elementos ==================
 const $ = (s) => document.querySelector(s);
-const ecras = { inicio: $("#ecra-inicio"), jogo: $("#ecra-jogo"), fim: $("#ecra-fim"), lb: $("#ecra-lb") };
+const ecras = { inicio: $("#ecra-inicio"), jogo: $("#ecra-jogo"), fim: $("#ecra-fim"), lb: $("#ecra-lb"), cursos: $("#ecra-cursos") };
 const cartaoA = $("#cartao-a");
 const cartaoB = $("#cartao-b");
 const vs = $("#vs");
@@ -261,6 +264,7 @@ function comecar() {
   if (pool.length < 2) return;
   vistos.clear();
   pontos = 0; streak = 0; melhorStreakJogo = 0; ultimoErro = null; jogoSubmetido = false;
+  palpitesJogo = [];
   recordeAntes = recordeDe(modo);
   emJogo = true;
 
@@ -331,6 +335,8 @@ async function escolher(escolha) {
     if (rapido && streak % BONUS_CADA === 0) { ajustarTempo(BONUS); toast(`🔥 ${streak} seguidas · +${BONUS} s`, "bom"); }
   } else {
     ultimoErro = { a: atual, b: proximo };
+    // escolheu "mais baixa" e era mais alta → subestimado; o contrário → sobrestimado
+    palpitesJogo.push({ campo, chave: proximo.chave, tipo: escolha === "baixa" ? "sub" : "sobre" });
     streak = 0;
     if (rapido) { ajustarTempo(-PENALIZACAO); toast(`−${PENALIZACAO} s`, "mau"); }
   }
@@ -361,6 +367,7 @@ async function escolher(escolha) {
 }
 
 function sair() {
+  if (emJogo) enviarPalpites();
   emJogo = false;
   clearInterval(timerId);
   mostrarEcra("inicio");
@@ -370,6 +377,7 @@ function sair() {
 function terminar() {
   if (!emJogo) return;
   emJogo = false;
+  enviarPalpites();
   clearInterval(timerId);
   const m = MODOS[modo];
   $("#fim-modo").textContent = `${m.icone} ${m.nome}` + (temFiltros() ? " · com filtros" : "");
@@ -596,6 +604,61 @@ async function verMaisLb() {
   }
 }
 
+// ================== Cursos subestimados / sobrestimados ==================
+function enviarPalpites() {
+  const eventos = palpitesJogo.slice(0, 300);
+  palpitesJogo = [];
+  if (!lbAtivo() || !eventos.length) return;
+  // keepalive: o pedido chega mesmo que o jogador feche a página logo a seguir
+  lbPedido("rpc/registar_palpites", { method: "POST", keepalive: true, body: JSON.stringify({ eventos }) })
+    .catch(() => {});
+}
+
+let cursosCampo = "nota";
+
+function abrirCursos(campo = cursosCampo) {
+  cursosCampo = campo;
+  document.querySelectorAll("#cursos-tabs .tab").forEach((b) => {
+    const ativa = b.dataset.campo === campo;
+    b.classList.toggle("ativa", ativa);
+    b.setAttribute("aria-selected", ativa);
+  });
+  const nota = campo === "nota";
+  $("#cursos-legenda-sub").textContent = nota ? "Os jogadores acharam a nota mais baixa do que é." : "Os jogadores acharam que tinha menos vagas.";
+  $("#cursos-legenda-sobre").textContent = nota ? "Os jogadores acharam a nota mais alta do que é." : "Os jogadores acharam que tinha mais vagas.";
+  mostrarEcra("cursos");
+  carregarCursos("subestimado", $("#lista-sub"));
+  carregarCursos("sobrestimado", $("#lista-sobre"));
+}
+
+async function carregarCursos(coluna, lista) {
+  const campo = cursosCampo;
+  lista.innerHTML = `<li class="lb-separador">A carregar…</li>`;
+  try {
+    // pede um pouco mais do que 10 para o caso de haver chaves que já não existem nos dados
+    const r = await lbPedido(`palpites_cursos?select=chave,${coluna}&campo=eq.${campo}` +
+      `&${coluna}=gt.0&order=${coluna}.desc&limit=${TOP + 10}`);
+    const linhas = (await r.json()).filter((l) => CURSO_POR_CHAVE.has(l.chave)).slice(0, TOP);
+    if (campo !== cursosCampo) return;
+    lista.innerHTML = "";
+    if (!linhas.length) lista.innerHTML = `<li class="lb-separador">Ainda sem dados. Joga para começar!</li>`;
+    linhas.forEach((l, i) => {
+      const c = CURSO_POR_CHAVE.get(l.chave);
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="pos${i < 3 ? " pos-" + (i + 1) : ""}">${i + 1}</span>
+        <span class="lb-nome"></span><span class="lb-extra"></span>
+        <strong class="lb-pontos" title="vezes que os jogadores erraram">${l[coluna]}×</strong>`;
+      li.querySelector(".lb-nome").textContent = c.curso;
+      li.querySelector(".lb-extra").textContent =
+        `${c.inst} · ${formatar(c[campo], campo)}${campo === "vagas" ? " vagas" : ""}`;
+      lista.appendChild(li);
+    });
+  } catch {
+    if (campo !== cursosCampo) return;
+    lista.innerHTML = `<li class="lb-separador erro">Não foi possível carregar.</li>`;
+  }
+}
+
 // ================== Eventos ==================
 $("#btn-comecar").addEventListener("click", comecar);
 $("#btn-repetir").addEventListener("click", comecar);
@@ -603,6 +666,11 @@ $("#btn-menu").addEventListener("click", () => { mostrarEcra("inicio"); atualiza
 $("#btn-sair").addEventListener("click", sair);
 $("#btn-ver-lb").addEventListener("click", () => abrirLeaderboard(modo));
 $("#btn-lb-mais").addEventListener("click", verMaisLb);
+$("#btn-ver-cursos").addEventListener("click", () => abrirCursos());
+$("#btn-lb-cursos").addEventListener("click", () => abrirCursos());
+$("#btn-cursos-voltar").addEventListener("click", () => { mostrarEcra("inicio"); atualizarInicio(); });
+document.querySelectorAll("#cursos-tabs .tab").forEach((b) => b.addEventListener("click", () => abrirCursos(b.dataset.campo)));
+window.addEventListener("pagehide", () => { if (emJogo) enviarPalpites(); });
 $("#btn-lb-voltar").addEventListener("click", () => { mostrarEcra("inicio"); atualizarInicio(); });
 $("#form-lb").addEventListener("submit", lbSubmeter);
 $("#form-jogador").addEventListener("submit", guardarNome);
@@ -623,4 +691,5 @@ construirModos();
 construirFiltros();
 mostrarNome();
 $("#btn-ver-lb").hidden = !lbAtivo();
+$("#btn-ver-cursos").hidden = !lbAtivo();
 atualizarInicio();

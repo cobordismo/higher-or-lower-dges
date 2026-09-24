@@ -135,6 +135,22 @@ select:focus, input:focus, .modo:focus-visible, .btn:focus-visible { outline: 2p
 .lb-mais { display: block; margin: -6px auto 14px; font-size: .95rem; text-decoration: none; }
 .lb-mais:disabled { opacity: .6; cursor: default; }
 .lb-mais[hidden] { display: none; }
+.links-inicio { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 14px; margin-top: 10px; }
+.links-inicio #btn-ver-lb { margin-top: 0; }
+.links-inicio .btn[hidden] { display: none; }
+
+/* Cursos subestimados / sobrestimados */
+.intro-cursos { max-width: 960px; }
+.cursos-grelha { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left; margin-bottom: 18px; }
+.titulo-cursos { font-size: 1.05rem; font-weight: 800; }
+.legenda-cursos { font-size: .8rem; color: var(--suave); margin: 2px 0 10px; }
+.lb-lista.lista-cursos li { grid-template-columns: 28px 1fr auto; grid-template-areas: "pos nome pontos" "pos extra pontos"; row-gap: 1px; }
+.lb-lista.lista-cursos .pos { grid-area: pos; }
+.lb-lista.lista-cursos .lb-nome { grid-area: nome; white-space: normal; line-height: 1.25; }
+.lb-lista.lista-cursos .lb-extra { grid-area: extra; overflow: hidden; text-overflow: ellipsis; font-size: .75rem; }
+.lb-lista.lista-cursos .lb-pontos { grid-area: pontos; font-size: 1.05rem; }
+.lb-lista.lista-cursos li.lb-separador { padding: 10px 0; }
+.lb-separador.erro { color: var(--vermelho); }
 .lb-lista li {
   display: grid; grid-template-columns: 36px 1fr auto auto; align-items: center; gap: 10px;
   padding: 10px 12px; border-radius: 12px;
@@ -348,5 +364,6 @@ select:focus, input:focus, .modo:focus-visible, .btn:focus-visible { outline: 2p
   .lb-nome { grid-area: nome; }
   .lb-pontos { grid-area: pontos; }
   .lb-extra { grid-area: extra; font-size: .72rem; }
+  .cursos-grelha { grid-template-columns: 1fr; gap: 14px; }
   .rodape { padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); }
 }

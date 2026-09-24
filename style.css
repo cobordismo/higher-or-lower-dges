@@ -132,6 +132,9 @@ select:focus, input:focus, .modo:focus-visible, .btn:focus-visible { outline: 2p
 }
 .tab.ativa { background: var(--acento); color: #1a1a1a; font-weight: 700; }
 .lb-lista { list-style: none; text-align: left; margin-bottom: 16px; }
+.lb-mais { display: block; margin: -6px auto 14px; font-size: .95rem; text-decoration: none; }
+.lb-mais:disabled { opacity: .6; cursor: default; }
+.lb-mais[hidden] { display: none; }
 .lb-lista li {
   display: grid; grid-template-columns: 36px 1fr auto auto; align-items: center; gap: 10px;
   padding: 10px 12px; border-radius: 12px;
@@ -338,7 +341,12 @@ select:focus, input:focus, .modo:focus-visible, .btn:focus-visible { outline: 2p
 
   .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0 14px; }
   .tab { padding: 9px 6px; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .lb-extra { display: none; }
-  .lb-lista li { grid-template-columns: 28px 1fr auto; padding: 9px 10px; }
+  /* nome em cima, streak/data/hora por baixo */
+  .lb-lista li { grid-template-columns: 28px 1fr auto; grid-template-areas: "pos nome pontos" "pos extra pontos";
+                 row-gap: 1px; padding: 8px 10px; }
+  .pos { grid-area: pos; }
+  .lb-nome { grid-area: nome; }
+  .lb-pontos { grid-area: pontos; }
+  .lb-extra { grid-area: extra; font-size: .72rem; }
   .rodape { padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); }
 }

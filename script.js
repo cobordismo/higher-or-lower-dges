@@ -482,65 +482,117 @@ function abrirLeaderboard(m = modo) {
   carregarLeaderboard();
 }
 
+// estado da lista aberta: permite carregar mais linhas sem repetir pedidos
+const MAIS = 50;
+const lb = { pedido: null, carregadas: 0, total: 0, minha: -1, minhaLinha: null, meuNome: "" };
+const chaveNome = (n) => n.trim().toLowerCase();
+const camposLb = "select=nome,pontos,melhor_streak,criado_em";
+
+function linhaLb(l, i) {
+  const li = document.createElement("li");
+  if (lb.meuNome && chaveNome(l.nome) === chaveNome(lb.meuNome)) li.classList.add("eu");
+  const quando = new Date(l.criado_em);
+  const data = quando.toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" }) + " · " +
+    quando.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+  const comStreak = Boolean(MODOS[lb.pedido].tempo);
+  li.innerHTML = `<span class="pos${i >= 0 && i < 3 ? " pos-" + (i + 1) : ""}">${i < 0 ? "—" : i + 1}</span>
+    <span class="lb-nome"></span>
+    <span class="lb-extra">${comStreak ? `🔥 ${l.melhor_streak} · ` : ""}${data}</span>
+    <strong class="lb-pontos">${l.pontos}</strong>`;
+  li.querySelector(".lb-nome").textContent = l.nome + (li.classList.contains("eu") ? " (tu)" : "");
+  return li;
+}
+
+// pede uma página do ranking e devolve as linhas; lê o total do cabeçalho Content-Range
+async function paginaLb(pedido, inicio, n) {
+  const r = await lbPedido(`pontuacoes?${camposLb}&modo=eq.${pedido}&order=pontos.desc,criado_em.asc` +
+    `&offset=${inicio}&limit=${n}`, { headers: { Prefer: "count=exact" } });
+  const total = Number((r.headers.get("content-range") || "").split("/")[1]);
+  return { linhas: await r.json(), total: Number.isFinite(total) ? total : null };
+}
+
+// a linha do próprio jogador aparece no fim (depois de "⋯") enquanto ainda não foi carregada
+function desenharMinhaLb() {
+  const lista = $("#lb-lista");
+  lista.querySelectorAll(".lb-separador, .lb-minha").forEach((el) => el.remove());
+  if (lb.minhaLinha && !(lb.minha >= 0 && lb.minha < lb.carregadas)) {
+    const sep = document.createElement("li");
+    sep.className = "lb-separador";
+    sep.textContent = "⋯";
+    const li = linhaLb(lb.minhaLinha, lb.minha);
+    li.classList.add("lb-minha");
+    lista.append(sep, li);
+  }
+  const falta = lb.total - lb.carregadas;
+  const btn = $("#btn-lb-mais");
+  btn.hidden = !(falta > 0);
+  btn.disabled = false;
+  btn.textContent = lb.carregadas <= TOP ? `⋯ Ver todas (${lb.total})` : `⋯ Ver mais (faltam ${falta})`;
+}
+
 async function carregarLeaderboard() {
   const lista = $("#lb-lista");
   const estado = $("#lb-lista-estado");
   const pedido = lbModo;
   lista.innerHTML = "";
+  $("#btn-lb-mais").hidden = true;
+  $("#lb-titulo").textContent = `🏆 Top ${TOP}`;
   estado.className = "lb-estado";
   estado.textContent = "A carregar…";
-  // top das melhores pontuações (o mesmo jogador pode aparecer várias vezes)
-  const campos = "select=nome,pontos,melhor_streak,criado_em";
-  const chave = (n) => n.trim().toLowerCase();
   try {
-    const r = await lbPedido(`pontuacoes?${campos}&modo=eq.${pedido}&order=pontos.desc,criado_em.asc&limit=${TOP}`);
-    const ranking = await r.json();
+    const { linhas: ranking, total } = await paginaLb(pedido, 0, TOP);
     if (pedido !== lbModo) return;
+    Object.assign(lb, { pedido, carregadas: ranking.length, total: total ?? ranking.length,
+      meuNome: nomeJogador(), minha: -1, minhaLinha: null });
 
-    const meuNome = nomeJogador();
-    let minha = meuNome ? ranking.findIndex((l) => chave(l.nome) === chave(meuNome)) : -1;
-    let minhaLinha = ranking[minha];
-    if (meuNome && minha < 0) {
+    const meu = chaveNome(lb.meuNome);
+    lb.minha = meu ? ranking.findIndex((l) => chaveNome(l.nome) === meu) : -1;
+    lb.minhaLinha = ranking[lb.minha] || null;
+    if (meu && lb.minha < 0) {
       // fora do top: vai buscar a melhor pontuação do jogador (vista "melhores") e conta quantas estão à frente
       try {
-        const rm = await lbPedido(`melhores?${campos}&modo=eq.${pedido}&chave=eq.${encodeURIComponent(chave(meuNome))}`);
-        minhaLinha = (await rm.json())[0];
-        if (minhaLinha) {
-          const rc = await lbPedido(`pontuacoes?select=nome&modo=eq.${pedido}&pontos=gt.${minhaLinha.pontos}`, {
+        const rm = await lbPedido(`melhores?${camposLb}&modo=eq.${pedido}&chave=eq.${encodeURIComponent(meu)}`);
+        lb.minhaLinha = (await rm.json())[0] || null;
+        if (lb.minhaLinha) {
+          const rc = await lbPedido(`pontuacoes?select=nome&modo=eq.${pedido}&pontos=gt.${lb.minhaLinha.pontos}`, {
             method: "HEAD", headers: { Prefer: "count=exact", Range: "0-0" },
           });
           const frente = Number((rc.headers.get("content-range") || "").split("/")[1]);
-          minha = Number.isFinite(frente) ? frente : -1;
+          lb.minha = Number.isFinite(frente) ? frente : -1;
         }
       } catch {}
       if (pedido !== lbModo) return;
     }
 
     estado.textContent = ranking.length ? "" : "Ainda ninguém jogou este modo. Sê o primeiro!";
-    const comStreak = Boolean(MODOS[pedido].tempo);
-    const linhaLi = (l, i) => {
-      const li = document.createElement("li");
-      if (chave(l.nome) === chave(meuNome)) li.classList.add("eu");
-      const data = new Date(l.criado_em).toLocaleDateString("pt-PT", { day: "numeric", month: "short" });
-      li.innerHTML = `<span class="pos${i >= 0 && i < 3 ? " pos-" + (i + 1) : ""}">${i < 0 ? "—" : i + 1}</span>
-        <span class="lb-nome"></span>
-        <span class="lb-extra">${comStreak ? `🔥 ${l.melhor_streak} · ` : ""}${data}</span>
-        <strong class="lb-pontos">${l.pontos}</strong>`;
-      li.querySelector(".lb-nome").textContent = l.nome + (li.classList.contains("eu") ? " (tu)" : "");
-      return li;
-    };
-    ranking.forEach((l, i) => lista.appendChild(linhaLi(l, i)));
-    // o jogador vê sempre a sua linha, mesmo fora do top
-    if (minhaLinha && !ranking.includes(minhaLinha)) {
-      const sep = document.createElement("li");
-      sep.className = "lb-separador";
-      sep.textContent = "⋯";
-      lista.append(sep, linhaLi(minhaLinha, minha));
-    }
+    ranking.forEach((l, i) => lista.appendChild(linhaLb(l, i)));
+    desenharMinhaLb();
   } catch {
     if (pedido !== lbModo) return;
     estado.className = "lb-estado erro";
     estado.textContent = "Não foi possível carregar o leaderboard.";
+  }
+}
+
+async function verMaisLb() {
+  const pedido = lb.pedido;
+  const btn = $("#btn-lb-mais");
+  btn.disabled = true;
+  btn.textContent = "A carregar…";
+  try {
+    const { linhas, total } = await paginaLb(pedido, lb.carregadas, MAIS);
+    if (pedido !== lbModo) return;
+    const lista = $("#lb-lista");
+    lista.querySelectorAll(".lb-separador, .lb-minha").forEach((el) => el.remove());
+    linhas.forEach((l, i) => lista.appendChild(linhaLb(l, lb.carregadas + i)));
+    lb.carregadas += linhas.length;
+    $("#lb-titulo").textContent = "🏆 Ranking completo";
+    if (total !== null) lb.total = total;
+    if (!linhas.length) lb.total = lb.carregadas;
+    desenharMinhaLb();
+  } catch {
+    btn.disabled = false;
+    btn.textContent = "Não foi possível carregar. Tentar outra vez";
   }
 }
 
@@ -550,6 +602,7 @@ $("#btn-repetir").addEventListener("click", comecar);
 $("#btn-menu").addEventListener("click", () => { mostrarEcra("inicio"); atualizarInicio(); });
 $("#btn-sair").addEventListener("click", sair);
 $("#btn-ver-lb").addEventListener("click", () => abrirLeaderboard(modo));
+$("#btn-lb-mais").addEventListener("click", verMaisLb);
 $("#btn-lb-voltar").addEventListener("click", () => { mostrarEcra("inicio"); atualizarInicio(); });
 $("#form-lb").addEventListener("submit", lbSubmeter);
 $("#form-jogador").addEventListener("submit", guardarNome);

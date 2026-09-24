@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <!-- Ecrã inicial -->
@@ -126,9 +126,10 @@
   <section id="ecra-lb" class="ecra">
     <div class="intro intro-lb">
       <p class="etiqueta">Leaderboard global</p>
-      <h1 class="h1-lb">🏆 Top 10</h1>
+      <h1 class="h1-lb" id="lb-titulo">🏆 Top 10</h1>
       <div class="tabs" id="lb-tabs" role="tablist"></div>
       <ol class="lb-lista" id="lb-lista"></ol>
+      <button id="btn-lb-mais" class="btn-link lb-mais" type="button" hidden>⋯ Ver todas</button>
       <p class="lb-estado" id="lb-lista-estado"></p>
       <button id="btn-lb-voltar" class="btn btn-secundario">Voltar</button>
     </div>
@@ -138,8 +139,8 @@
     Dados: DGES — Concurso Nacional de Acesso 2026, 1.ª fase, contingente geral (notas na escala 0–200).
   </footer>
 
-  <script src="data.js?v=4"></script>
-  <script src="config.js?v=4"></script>
-  <script src="script.js?v=4"></script>
+  <script src="data.js?v=6"></script>
+  <script src="config.js?v=6"></script>
+  <script src="script.js?v=6"></script>
 </body>
 </html>

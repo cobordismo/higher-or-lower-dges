@@ -48,7 +48,7 @@ const GRAUS = { L1: "Licenciatura", MI: "Mestrado Integrado" };
 const MODOS = {
   relogio: {
     nome: "Contra-relógio", icone: "⏱", campo: "nota", tempo: 120, pistas: true,
-    desc: "Notas · 120 s · errar −7 s · 5 seguidas +5 s",
+    desc: "Notas · 120 s · errar −7 s · 5 seguidas +5 s",
     pergunta: "Rápido! O segundo curso tem nota mais alta ou mais baixa?",
     alta: "Mais alta", baixa: "Mais baixa", legenda: "nota do último colocado",
   },
@@ -66,7 +66,7 @@ const MODOS = {
   },
   "vagas-relogio": {
     nome: "Vagas contra-relógio", icone: "⏳", campo: "vagas", tempo: 60,
-    desc: "Vagas · 60 s",
+    desc: "Vagas · 60 s",
     pergunta: "Rápido! O segundo curso tem mais ou menos vagas?",
     alta: "Mais vagas", baixa: "Menos vagas", legenda: "vagas iniciais",
   },
@@ -522,7 +522,7 @@ async function carregarLeaderboard() {
       const li = document.createElement("li");
       if (chave(l.nome) === chave(meuNome)) li.classList.add("eu");
       const data = new Date(l.criado_em).toLocaleDateString("pt-PT", { day: "numeric", month: "short" });
-      li.innerHTML = `<span class="pos">${i < 0 ? "—" : ["🥇", "🥈", "🥉"][i] || i + 1}</span>
+      li.innerHTML = `<span class="pos${i >= 0 && i < 3 ? " pos-" + (i + 1) : ""}">${i < 0 ? "—" : i + 1}</span>
         <span class="lb-nome"></span>
         <span class="lb-extra">${comStreak ? `🔥 ${l.melhor_streak} · ` : ""}${data}</span>
         <strong class="lb-pontos">${l.pontos}</strong>`;

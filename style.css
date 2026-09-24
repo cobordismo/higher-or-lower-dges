@@ -12,16 +12,19 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body { height: 100%; }
+html { background: var(--fundo); -webkit-text-size-adjust: 100%; }
 
 body {
   font-family: "Inter", system-ui, sans-serif;
-  background: radial-gradient(circle at 20% 0%, #23264a 0%, var(--fundo) 60%);
+  background: radial-gradient(circle at 20% 0%, #23264a 0%, var(--fundo) 60%) no-repeat;
+  background-size: 100% 100vh;
   color: var(--texto);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
 }
+button, select, input { touch-action: manipulation; }
 
 /* ---------- Ecrãs ---------- */
 .ecra { display: none; flex: 1; }
@@ -65,7 +68,7 @@ h1 span { color: var(--suave); font-weight: 500; font-size: .6em; }
   display: flex; align-items: center; gap: 12px;
   transition: border-color .15s, background .15s, transform .12s;
 }
-.modo:hover { transform: translateY(-2px); background: rgba(255,255,255,.08); }
+@media (hover: hover) { .modo:hover { transform: translateY(-2px); background: rgba(255,255,255,.08); } }
 .modo.selecionado { border-color: var(--acento); background: rgba(255,204,77,.1); }
 .modo-icone { font-size: 1.3rem; line-height: 1; }
 .modo-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -135,7 +138,14 @@ select:focus, input:focus, .modo:focus-visible, .btn:focus-visible { outline: 2p
 }
 .lb-lista li:nth-child(odd) { background: rgba(255,255,255,.04); }
 .lb-lista li.eu { outline: 1px solid var(--acento); }
-.pos { text-align: center; font-weight: 700; color: var(--suave); }
+.pos {
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 800; font-size: .9rem; color: var(--suave); background: rgba(255,255,255,.08);
+  font-variant-numeric: tabular-nums;
+}
+.pos-1 { background: #ffcc4d; color: #3a2a00; }
+.pos-2 { background: #cfd3e0; color: #252838; }
+.pos-3 { background: #d98e52; color: #3a1d06; }
 .lb-nome { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-extra { font-size: .8rem; color: var(--suave); white-space: nowrap; }
 .lb-pontos { font-size: 1.2rem; color: var(--acento); font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
@@ -150,7 +160,7 @@ select:focus, input:focus, .modo:focus-visible, .btn:focus-visible { outline: 2p
   padding: 14px 28px;
   transition: transform .12s, filter .12s;
 }
-.btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+@media (hover: hover) { .btn:hover { transform: translateY(-2px); filter: brightness(1.1); } }
 .btn:active { transform: translateY(0); }
 .btn:disabled { opacity: .5; cursor: default; transform: none; }
 .btn-principal { background: var(--acento); color: #1a1a1a; font-size: 1.1rem; }
@@ -287,16 +297,48 @@ select:focus, input:focus, .modo:focus-visible, .btn:focus-visible { outline: 2p
 
 /* ---------- Telemóvel ---------- */
 @media (max-width: 760px) {
-  .arena { grid-template-columns: 1fr; padding: 8px 16px 16px; gap: 10px; }
-  .cartao { min-height: 0; padding: 22px 18px; }
-  .valor { font-size: 2.3rem; }
-  .escondida:not(.pistas) .stats { display: none; }
-  .escondida .valor-box { min-height: 0; height: 0; margin: 0; }
-  .modos { grid-template-columns: 1fr; }
-  .placar { padding: 12px 16px 4px; gap: 8px; font-size: .9rem; }
+  .intro { padding: 20px 16px 28px; }
+  h1 { margin: 8px 0 4px; }
+
+  /* 16px evita o zoom automático do iPhone ao tocar num campo */
+  select, input { font-size: 16px; }
+  .jogador { margin: 14px auto 20px; }
+  .modos { grid-template-columns: 1fr; gap: 8px; margin-bottom: 18px; }
+  .modo { padding: 12px 14px; }
+  .modo.destaque { justify-content: flex-start; padding: 14px 16px; gap: 14px; }
+  .modo.destaque .modo-icone { font-size: 1.7rem; }
+  .filtros { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .filtros label { max-width: none; }
+  .filtros label:last-child { grid-column: 1 / -1; }
+  .info-filtro { margin: 10px 0 14px; }
+  #btn-comecar { width: 100%; }
+  .recorde-inicio { font-size: .9rem; }
+
+  .placar { padding: 10px 12px 2px; gap: 6px; font-size: .85rem; flex-wrap: nowrap; }
   .placar strong { font-size: 1.1rem; margin-left: 3px; }
-  .barra-tempo { margin: 0 16px 8px; }
+  .btn-voltar { padding: 6px 12px; }
+  .pergunta { font-size: .85rem; padding: 2px 12px 6px; }
+  .barra-tempo { margin: 0 12px 6px; }
+  .arena { grid-template-columns: 1fr; padding: 4px 12px 12px; gap: 8px; }
+  .cartao { min-height: 0; padding: 18px 16px; gap: 6px; border-radius: 16px; }
+  .curso { font-size: 1.3rem; }
+  .inst { font-size: .95rem; }
+  .escola { font-size: .85rem; }
+  .valor-box { margin-top: 6px; min-height: 0; }
+  .valor { font-size: 2.1rem; }
+  .stats > div { padding: 4px 12px; min-width: 76px; }
+  .escondida:not(.pistas) .stats { display: none; }
+  .escondida .valor-box { height: 0; margin: 0; }
+  .botoes { width: 100%; gap: 10px; margin-top: 10px; flex-wrap: nowrap; }
+  .botoes .btn { flex: 1; padding: 14px 10px; }
+  .vs { width: 44px; height: 44px; justify-self: center; margin: -22px 0; z-index: 1; font-size: .9rem; }
+
+  .acoes .btn { flex: 1 1 140px; padding: 14px 16px; white-space: nowrap; }
+  .form-lb .linha input, .jogador .linha input { min-width: 0; }
+
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0 14px; }
+  .tab { padding: 9px 6px; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lb-extra { display: none; }
-  .lb-lista li { grid-template-columns: 32px 1fr auto; }
-  .vs { width: 48px; height: 48px; justify-self: center; margin: -26px 0; z-index: 1; }
+  .lb-lista li { grid-template-columns: 28px 1fr auto; padding: 9px 10px; }
+  .rodape { padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); }
 }

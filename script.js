@@ -755,7 +755,7 @@ function enviarPalpites(aFechar = false) {
 }
 
 let cursosCampo = "nota";
-const MIN_PALPITES = 5; // abaixo disto a percentagem ainda não diz nada
+const MIN_PALPITES = 3; // abaixo disto a percentagem ainda não diz nada
 
 function abrirCursos(campo = cursosCampo) {
   cursosCampo = campo;
